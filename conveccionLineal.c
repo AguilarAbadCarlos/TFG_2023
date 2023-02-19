@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdbool.h>
+#include <time.h>
 
 #define L 80.0			// Longitude [m]
 #define D 0.5			// Diameter [m]
@@ -12,13 +13,23 @@
 #define CFL 1.0		// CFL number
 #define g 9.81
 
-#define InitialCondition 2
+#define INITIAL_CONDITION 2
+#define MESH_REGULARITY 2
 
 #define v0 5.0			// Initial velocity
 #define PI (4*atan(1))
 
 #define MIN(x,y) (x < y ? x : y)
 #define MAX(x,y) (x > y ? x : y)
+
+#define NormRANu (2.3283063671E-10F)
+#define Frec_Max 100
+unsigned int irr[256];
+unsigned int ir1;
+unsigned char ind_ran,ig1,ig2,ig3;
+int frec[Frec_Max];
+extern float Random(void);
+extern void ini_ran(int SEMILLA);
 
 int PrintToFile (int *PrintCounter, double x[], double v[], double t);
 double GlobalTimeStep (double dx[], double t, double *dtLocal);
@@ -28,6 +39,9 @@ double Gaussian (double x);
 void ErrorNorms (double v[], double dx[], double x[]);
 
 int main () {
+
+    srand(time(NULL));
+    ini_ran(rand());
 
     int i,iter=0,k=0,printFreq=1;
 	double v[nCells];		// Velocity arrays (conserved variables)
@@ -66,6 +80,9 @@ int main () {
 	}
 
 //	Irregular mesh
+
+#if MESH_REGULARITY == 1
+
 	dx[0]=1.0;
 	x[0]=dx[0]/2;
 	for (i=1;i<35;i++){
@@ -89,38 +106,32 @@ int main () {
         x[i] = x[i-1] + 0.5 * (dx[i-1]+dx[i]);
 	}
 
-	// Initial conditions -- Square wave
-//	for (i=0;i<25;i++){
-//        v[i]=0.0;
-//        Q[i]=A*v[i];
-//	}
-//	for (i=25;i<75;i++){
-//        v[i]=v0;
-//        Q[i]=A*v[i];
-//	}
-//	for (i=75;i<nCells;i++){
-//        v[i]=0.0;
-//        Q[i]=A*v[i];
-//	}
+#elif MESH_REGULARITY == 2
 
-	switch (InitialCondition){
+    dx[0] = 2.*Random();
+    x[0] = dx[0]/2.;
+    for (i=0; i<nCells; i++){
+        dx[i] = 2.*Random();
+        x[i] = x[i-1] + 0.5 * (dx[i-1] + dx[i]);
+    }
 
-    case 1:
+#else
+
+// Undefined
+
+#endif // MESH_REGULARITY
+
+// INITIAL CONDITION SETUP
+
+#if INITIAL_CONDITION == 1
 
         for (i=0; i<nCells; i++) v[i] = SquareWave(x[i]);
-        break;
 
-    case 2:
+#else
 
         for (i=0; i<nCells; i++) v[i] = Gaussian(x[i]);
-        break;
 
-    default:
-
-        for (i=0; i<nCells; i++) v[i] = SquareWave(x[i]);
-        break;
-
-	}
+#endif // INITIAL_CONDITION
 
 //  Testing mesh initialization
 //    for (i=0;i<nCells;i++){
@@ -167,7 +178,7 @@ int main () {
         }
 
         for (i=0; i<nCells; i++){
-            allowsFrozenFlux[i] = (dtLocal[i] > 2.*dt);
+            allowsFrozenFlux[i] = (dtLocal[i] >= 2.*dt);
 //            printf(allowsFrozenFlux[i] ? "allowsFrozenFlux[i]=true\n" : "allowsFrozenFlux[i]=false\n");
             flux[i] = FluxFunction(i, v, &FluxCounter);
             tFrozen[i] = t + kLocal[i] * dt;
@@ -200,7 +211,7 @@ int main () {
 
                     if (t + dt > tFrozen[i]){
                         flux[i] = FluxFunction(i, v, &FluxCounter);
-                        allowsFrozenFlux[i] = (dtLocal[i] > 2.*dt);
+                        allowsFrozenFlux[i] = (dtLocal[i] >= 2.*dt);
                         tFrozen[i] = t + dtLocal[i];
 //                        printf("i=%d",i);
 
@@ -302,36 +313,23 @@ void ErrorNorms (double v[], double dx[], double x[]){
     double L1=0., L2=0., Linf=0.;
     int i;
 
-    switch (InitialCondition){
+#if INITIAL_CONDITION == 1
 
-    case 1:
+    for (i=0; i<nCells; i++){
+        L1 = L1 + fabs(v[i]-SquareWave(x[i]-c*simTime))*dx[i];
+        L2 = L2 + pow(fabs(v[i]-SquareWave(x[i]-c*simTime)),2)*dx[i];
+        Linf = MAX(Linf, fabs(v[i]-SquareWave(x[i]-c*simTime)));
+    }
 
-        for (i=0; i<nCells; i++){
-            L1 = L1 + fabs(v[i]-SquareWave(x[i]-c*simTime))*dx[i];
-            L2 = L2 + pow(fabs(v[i]-SquareWave(x[i]-c*simTime)),2)*dx[i];
-            Linf = MAX(Linf, fabs(v[i]-SquareWave(x[i]-c*simTime)));
-        }
-        break;
+#else
 
-    case 2:
-
-        for (i=0; i<nCells; i++){
+    for (i=0; i<nCells; i++){
             L1 = L1 + fabs(v[i]-Gaussian(x[i]-c*simTime))*dx[i];
             L2 = L2 + pow(fabs(v[i]-Gaussian(x[i]-c*simTime)),2)*dx[i];
             Linf = MAX(Linf, fabs(v[i]-Gaussian(x[i]-c*simTime)));
-        }
-        break;
-
-    default:
-
-        for (i=0; i<nCells; i++){
-            L1 = L1 + fabs(v[i]-SquareWave(x[i]-c*simTime))*dx[i];
-            L2 = L2 + pow(fabs(v[i]-SquareWave(x[i]-c*simTime)),2)*dx[i];
-            Linf = MAX(Linf, fabs(v[i]-SquareWave(x[i]-c*simTime)));
-        }
-        break;
-
     }
+
+#endif
 
     printf("\n\nError norms:\n");
     printf("\tL1=%lf",L1);
@@ -341,6 +339,35 @@ void ErrorNorms (double v[], double dx[], double x[]){
 }
 
 
+float Random(void)
+{
+float r;
+ig1=ind_ran-24;
+ig2=ind_ran-55;
+ig3=ind_ran-61;
+irr[ind_ran]=irr[ig1]+irr[ig2];
+ir1=(irr[ind_ran]^irr[ig3]);
+ind_ran++;
+r=ir1*NormRANu;
+//printf("r=%f\n",r);
+return r;
+}
+
+void ini_ran(int SEMILLA)
+{
+//printf("%d",SEMILLA);
+int INI,FACTOR,SUM,i;
+srand(SEMILLA);
+INI=SEMILLA;
+FACTOR=67397;
+SUM=7364893;
+for(i=0;i<256;i++)
+{
+INI=(INI*FACTOR+SUM);
+irr[i]=INI;
+}
+ind_ran=ig1=ig2=ig3=0;
+}
 
 
 
