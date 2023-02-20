@@ -13,7 +13,7 @@
 #define CFL 1.0		// CFL number
 #define g 9.81
 
-#define INITIAL_CONDITION 2
+#define INITIAL_CONDITION 1
 #define MESH_REGULARITY 2
 
 #define v0 5.0			// Initial velocity
