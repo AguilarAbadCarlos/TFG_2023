@@ -8,12 +8,12 @@
 #define D 0.5			// Diameter [m]
 #define c 1.0		// wave speed [m/s]
 #define simTime 10.0	// Simulation time [s]
-#define nCells 100		    // Number of nodes
+#define nCells 10000		    // Number of nodes
 //#define dx (L/(imax-1))     // Spatial increment
 #define CFL 1.0		// CFL number
 #define g 9.81
 
-#define INITIAL_CONDITION 1
+#define INITIAL_CONDITION 2
 #define MESH_REGULARITY 2
 
 #define v0 5.0			// Initial velocity
@@ -41,7 +41,10 @@ void ErrorNorms (double v[], double dx[], double x[]);
 int main () {
 
     srand(time(NULL));
-    ini_ran(rand());
+//    ini_ran(rand());
+
+    int semilla = 32207;
+    ini_ran(semilla);
 
     int i,iter=0,k=0,printFreq=1;
 	double v[nCells];		// Velocity arrays (conserved variables)
@@ -108,10 +111,11 @@ int main () {
 
 #elif MESH_REGULARITY == 2
 
-    dx[0] = 2.*Random();
+    double to100m = 100./nCells;
+    dx[0] = 2.*to100m*Random();
     x[0] = dx[0]/2.;
     for (i=0; i<nCells; i++){
-        dx[i] = 2.*Random();
+        dx[i] = 2.*to100m*Random();
         x[i] = x[i-1] + 0.5 * (dx[i-1] + dx[i]);
     }
 
@@ -355,7 +359,7 @@ return r;
 
 void ini_ran(int SEMILLA)
 {
-//printf("%d",SEMILLA);
+printf("%d",SEMILLA);
 int INI,FACTOR,SUM,i;
 srand(SEMILLA);
 INI=SEMILLA;
