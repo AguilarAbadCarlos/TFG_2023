@@ -40,6 +40,14 @@ void ErrorNorms (double v[], double dx[], double x[]);
 
 int main () {
 
+/*
+
+ALGORITMO COMPLETO. MEJORA RESULTADOS DE UPWIND EN AMBAS MALLAS CON
+AMBAS CONDICIONES INICIALES. MÁS RÁPIDO Y EFICIENTE EN No DE EVALUA-
+CIONES DE FLUJOS. PODRÍA FALLAR EL CRITERIO DE CONGELACIÓN? BURGUERS.
+
+*/
+	
     srand(time(NULL));
 //    ini_ran(rand());
 
