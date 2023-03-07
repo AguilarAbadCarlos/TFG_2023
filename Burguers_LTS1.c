@@ -4,7 +4,9 @@ Burgers equation simulation usign LTS1 algorithm
 
 Carlos Aguilar Abad - 795480@unizar.es
 
-Current version: G1/G2 interfaces treatment not correctly implemented
+Current version: G1/G2 interfaces treatment not correctly implemented, INITIAL_CONDITION 1 (square wave) works quite alright
+(slight understimation in shockwave speed and difussion in rarefaction wave) but might need check, INITIAL_CONDITION 2 has numerical
+inestability regarding the negative speed, bad G1/G2 interface treatment I guess
 
 
 */
@@ -19,17 +21,17 @@ Current version: G1/G2 interfaces treatment not correctly implemented
 #define L 100.0			// Longitude [m]
 #define D 0.5			// Diameter [m]
 #define c 1.0		// wave speed [m/s]
-#define simTime 10.0	// Simulation time [s]
+#define simTime 100.0	// Simulation time [s]
 #define nCells 100		    // Number of nodes
 #define dx (L/nCells)    // Spatial increment
 #define CFL 1.0		// CFL number
 #define g 9.81
 
-#define INITIAL_CONDITION 1
+#define INITIAL_CONDITION 2
 #define MESH_REGULARITY 0
 
-#define v1 1.0			// Initial velocity
-#define v2 3.0
+#define v1 -1.0			// Initial velocity
+#define v2 2.0
 #define x1 35.
 #define x2 65.
 #define PI (4*atan(1))
@@ -51,7 +53,7 @@ double GlobalTimeStep (double v[], double *dtLocal);
 double FluxFunction (int i, double v[], int *FluxCounter);
 double SquareWave (double x);
 double Gaussian (double x);
-void ErrorNorms (double v[], double x[]);
+void ErrorNorms (double v[], double exact[]);
 int exactBurgers(double t, double *exact);
 
 int main () {
@@ -152,6 +154,12 @@ int main () {
 
         for (i=0; i<nCells; i++) v[i] = SquareWave(x[i]);
 
+#elif INITIAL_CONDITION == 2
+
+        for (i=0; x[i]<x1; i++) v[i] = v2;
+        for (; x[i]<x2; i++)    v[i] = v2 - 2* v2 *(i*dx-x1) / (x2-x1);
+        for (; i<nCells; i++)   v[i] = -v2;
+
 #else
 
         for (i=0; i<nCells; i++) v[i] = Gaussian(x[i]);
@@ -204,7 +212,7 @@ int main () {
         }
 
         allowsFrozenFlux[0] = (dtLocal[0] > 2.*dt);
-        flux[0] = FluxFunction(i, v, &FluxCounter);
+        flux[0] = FluxFunction(0, v, &FluxCounter);
         tFrozen[0] = t + kLocal[0] * dt;
 
         for (i=1; i<nCells; i++){
@@ -288,7 +296,7 @@ int main () {
     exactBurgers(t,exact);
     PrintToFile(&PrintCounter, x, v, exact, t);
     printf("Flux function evaluations:%d, iterations=%d",FluxCounter,IterCounter);
-//    ErrorNorms(v,dx,x);
+    ErrorNorms(v,exact);
     return 0;
 }
 
@@ -363,28 +371,17 @@ double Gaussian (double x){
 
 }
 
-void ErrorNorms (double v[], double x[]){
+void ErrorNorms (double v[], double exact[]){ // CHANGE FOR EXACT SOLUTION GIVEN BELOW
 
     double L1=0., L2=0., Linf=0.;
     int i;
 
-#if INITIAL_CONDITION == 1
 
     for (i=0; i<nCells; i++){
-//        L1 = L1 + fabs(v[i]-SquareWave(x[i]-c*simTime))*dx;
-//        L2 = L2 + pow(fabs(v[i]-SquareWave(x[i]-c*simTime)),2)*dx;
-//        Linf = MAX(Linf, fabs(v[i]-SquareWave(x[i]-c*simTime)));
+        L1 = L1 + fabs(v[i]-exact[i])*dx;
+        L2 = L2 + pow(fabs(v[i]-exact[i]),2)*dx;
+        Linf = MAX(Linf, fabs(v[i]-exact[i]));
     }
-
-#else
-
-    for (i=0; i<nCells; i++){
-            L1 = L1 + fabs(v[i]-Gaussian(x[i]-c*simTime))*dx[i];
-            L2 = L2 + pow(fabs(v[i]-Gaussian(x[i]-c*simTime)),2)*dx[i];
-            Linf = MAX(Linf, fabs(v[i]-Gaussian(x[i]-c*simTime)));
-    }
-
-#endif
 
     printf("\n\nError norms:\n");
     printf("\tL1=%lf",L1);
@@ -395,6 +392,8 @@ void ErrorNorms (double v[], double x[]){
 
 int exactBurgers(double t, double *exact){      // Exact solution for the Burgers equation with square initial condition
     int i;
+
+#if INITIAL_CONDITION == 1
     int i1=(int)round((x1+v1*t)/dx);
     int i2=(int)round((x1+v2*t)/dx);
     int i3=(int)round((x2+(v2+v1)/2.*t)/dx);
@@ -412,6 +411,21 @@ int exactBurgers(double t, double *exact){      // Exact solution for the Burger
         exact[i]=v1;
     }
     return 0;
+
+#elif INITIAL_CONDITION == 2
+
+    int i1=(int) MIN(round((x1+v2*t)/dx),0.5*(x1+x2)/dx);
+    int i2=(int) MAX(round((x2-v2*t)/dx),0.5*(x1+x2)/dx);
+
+    for (i=0; i<i1; i++)        exact[i] = v2;
+    for (i=i1; i<i2; i++)       exact[i] = v2 - 2.* v2 * (i*dx-x1-v2*t)/(x2-x1+2.*v2*t);
+    for (i=i2; i<nCells; i++)   exact[i] = -v2;
+
+#else
+
+// UNDEFINED
+
+#endif // INITIAL_CONDITION
 }
 
 
