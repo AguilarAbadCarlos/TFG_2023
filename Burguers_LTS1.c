@@ -4,7 +4,10 @@ Burgers equation simulation usign LTS1 algorithm
 
 Carlos Aguilar Abad - 795480@unizar.es
 
-Current version: G1/G2 interfaces treatment not correctly implemented, INITIAL_CONDITION 1 (square wave) works quite alright
+Current version: INITIAL CONDTION 2 SEEMS TO BE WORKING :D
+
+
+PREV: G1/G2 interfaces treatment not correctly implemented, INITIAL_CONDITION 1 (square wave) works quite alright
 (slight understimation in shockwave speed and difussion in rarefaction wave) but might need check, INITIAL_CONDITION 2 has numerical
 inestability regarding the negative speed, bad G1/G2 interface treatment I guess
 
