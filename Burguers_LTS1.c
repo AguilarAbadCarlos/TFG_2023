@@ -21,22 +21,22 @@ inestability regarding the negative speed, bad G1/G2 interface treatment I guess
 #include <stdbool.h>
 #include <time.h>
 
-#define L 100.0			// Longitude [m]
-#define D 0.5			// Diameter [m]
+//#define L 100.0			// Longitude [m]
+//#define D 0.5			// Diameter [m]
 #define c 1.0		// wave speed [m/s]
-#define simTime 100.0	// Simulation time [s]
-#define nCells 100		    // Number of nodes
-#define dx (L/nCells)    // Spatial increment
+//#define simTime 10.0	// Simulation time [s]
+//#define nCells 100		    // Number of nodes
+//#define dx (L/nCells)    // Spatial increment
 #define CFL 1.0		// CFL number
 #define g 9.81
 
-#define INITIAL_CONDITION 2
+#define INITIAL_CONDITION 1
 #define MESH_REGULARITY 0
 
-#define v1 -1.0			// Initial velocity
-#define v2 2.0
-#define x1 35.
-#define x2 65.
+//#define v1 1.0			// Initial velocity
+//#define v2 2.0
+//#define x1 35.
+//#define x2 65.
 #define PI (4*atan(1))
 
 #define MIN(x,y) (x < y ? x : y)
@@ -59,6 +59,9 @@ double Gaussian (double x);
 void ErrorNorms (double v[], double exact[]);
 int exactBurgers(double t, double *exact);
 
+double L, simTime, dx, v1, v2, x1, x2;
+int nCells;
+
 int main () {
 
     srand(time(NULL));
@@ -67,14 +70,20 @@ int main () {
     int semilla = 32207;
     ini_ran(semilla);
 
+    FILE *inParams;
+    inParams=fopen("parametrosBurgers.txt","r");
+//    f'{L:.1f} {simTime:.1f} {nCells:d} {dx:f} {v1:.1f} {v2:.1f} {x1:.1f} {x2:.1f}'
+    fscanf(inParams, "%lf %lf %i %lf %lf %lf %lf %lf", &L, &simTime, &nCells, &dx, &v1, &v2, &x1, &x2);
+    fclose(inParams);
+
     int i,iter=0,k=0,printFreq=1, j=0;
 	double v[nCells];		// Velocity arrays (conserved variables)
-	double vL[nCells];      // Interpolation points
-	double Q[nCells], x[nCells], exact[nCells];			// Discharge, distance
+//	double vL[nCells];      // Interpolation points
+	double x[nCells], exact[nCells];			// Discharge, distance
 	double t=0.0, dt, dtGlobal, dtLocal[nCells], tLocal=0., tFrozen[nCells];                // Time
 	double flux[nCells];
-	double A;                       // Area
-	int PrintCounter=0, FluxCounter=0, IterCounter=0;             // Print counter
+	double eps = 1e-6;                       // Area
+	int PrintCounter=0, FluxCounter=0, IterCounter=0, COUNTER=0;             // Print counter
 	int kLocal[nCells], kMax=0;
 	bool allowsFrozenFlux[nCells];
 
@@ -89,14 +98,14 @@ int main () {
 	printf("\n   CFL: %.2lf",CFL);
 	printf("\n   Number of cells: %d",nCells);
 	printf("\n   dx: %.2lf m",dx);
-	printf("\n   Pipe length: %.2lf m\n",L);
+	printf("\n   Pipe length: %.2lf m\n\n",L);
 
 
 	// Variable initialization
 	for (i=0;i<nCells;i++){
         v[i] = 0.0;
-        vL[i] = 0.0;
-        Q[i] = 0.0;
+//        vL[i] = 0.0;
+//        Q[i] = 0.0;
         x[i] = 0.0;
         allowsFrozenFlux[i] = false;
         flux[i] = 0.0;
@@ -171,13 +180,13 @@ int main () {
 
 //  Testing mesh initialization
 //    for (i=0;i<nCells;i++){
-//        printf("%d\t%.3f\t%.3f\n",i,dx[i],x[i]);
+//        printf("%d\t%.3f\n",i,x[i]);
 //    }
 
 //  Testing velocity initialization
-    for (i=0;i<nCells;i++){
-        printf("%d\t%.3f\n",i,v[i]);
-    }
+//    for (i=0;i<nCells;i++){
+//        printf("%d\t%.3f\n",i,v[i]);
+//    }
 //  getchar();
 
     exactBurgers(t,exact);
@@ -189,13 +198,13 @@ int main () {
 
 //        printf("Iniciando Global Time Step...\n");
 
-        dt = GlobalTimeStep(v,dtLocal);
+        dt = MIN(GlobalTimeStep(v,dtLocal),simTime-t);
 
-        if (t+dt > simTime){
-            dt = simTime - t;
-        }
+//        if (t+dt > simTime){
+//            dt = simTime - t;
+//        }
 
-        printf("dt=%lf\n",dt);
+//        printf("dt=%lf\n",dt);
 //        getchar();
 
         kLocal[0] = (int) (dtLocal[0]/dt);
@@ -206,77 +215,65 @@ int main () {
         }
         dtGlobal = kMax*dt;
 
-        printf("dtGlobal=%lf\n",dtGlobal);
-        printf("kMax=%d\n",kMax);
+//        printf("dtGlobal=%lf\n",dtGlobal);
+//        printf("kMax=%d\n",kMax);
 //        getchar();
 
-        if (t+dtGlobal > simTime){
-            dtGlobal =  simTime - t;
-        }
+//        if (t+dtGlobal > simTime && simTime - t > eps){
+//            dtGlobal =  simTime - t;
+//        }
 
-        allowsFrozenFlux[0] = (dtLocal[0] > 2.*dt);
-        flux[0] = FluxFunction(0, v, &FluxCounter);
-        tFrozen[0] = t + kLocal[0] * dt;
+//        allowsFrozenFlux[0] = (dtLocal[0] > 2.*dt);
+//        flux[0] = FluxFunction(0, v, &FluxCounter);
+//        tFrozen[0] = t + kLocal[0] * dt;
 
-        for (i=1; i<nCells; i++){
-            allowsFrozenFlux[i] = (dtLocal[i] > 2.*dt);
-            printf(allowsFrozenFlux[i] ? "allowsFrozenFlux[i]=true\n" : "allowsFrozenFlux[i]=false\n");
-            flux[i] = FluxFunction(i, v, &FluxCounter);
-            tFrozen[i] = t + kLocal[i] * dt;
-            printf("dtLocal[i]=%lf flux[i]=%lf\n",dtLocal[i],flux[i]);
-        }
+//        for (i=0; i<nCells; i++){
+//            allowsFrozenFlux[i] = (dtLocal[i] > 2.*dt);
+////            printf(allowsFrozenFlux[i] ? "allowsFrozenFlux[i]=true\n" : "allowsFrozenFlux[i]=false\n");
+//            flux[i] = FluxFunction(i, v, &FluxCounter);
+//            COUNTER++;
+//            tFrozen[i] = t + kLocal[i] * dt;
+////            printf("dtLocal[i]=%lf flux[i]=%lf\n",dtLocal[i],flux[i]);
+//        }
+//
+//        for (i=0; i<nCells; i++){
+//            if (i>0 && allowsFrozenFlux[i-1]!=allowsFrozenFlux[i]){
+//                if (v[i-1]>0 && !allowsFrozenFlux[i-1]) allowsFrozenFlux[i] = false;
+//                if (v[i]<0 && !allowsFrozenFlux[i]) allowsFrozenFlux[i-1] = false;
+//            }
+//            if (v[i]>0){
+//                k = MIN((int) v[i] * dtGlobal,nCells-1-i);
+//                for (j=1; j<=k; j++){
+//                    tFrozen[i+j] = MIN(tFrozen[i+j], t + j*dx/v[i]);
+//                }
+//            } else if (v[i]<0) {
+//                k = MIN((int) -v[i] * dtGlobal,i);
+//                for (j=1; j<=k; j++){
+//                    tFrozen[i-j] = MIN(tFrozen[i-j], t - j*dx/v[i]);
+//                }
+//            }
+//        }
 
-        for (i=0; i<nCells; i++){
-            if (i>0 && allowsFrozenFlux[i-1]!=allowsFrozenFlux[i]){
-                if (v[i-1]>0 && !allowsFrozenFlux[i-1]) allowsFrozenFlux[i] = false;
-                if (v[i]<0 && !allowsFrozenFlux[i]) allowsFrozenFlux[i-1] = false;
-            }
-            if (v[i]>0){
-                k = MIN((int) v[i] * dtGlobal,nCells-1-i);
-                for (j=1; j<=k; j++){
-                    tFrozen[i+j] = MIN(tFrozen[i+j], t + j*dx/v[i]);
-                }
-            } else {
-                k = MIN((int) -v[i] * dtGlobal,i);
-                for (j=1; j<=k; j++){
-                    tFrozen[i-j] = MIN(tFrozen[i-j], t - j*dx/v[i]);
-                }
-            }
-        }
+
 
 //        getchar();
 
-        tLocal = t + dtGlobal;
+        tLocal = MIN(t + dtGlobal,simTime);
 
-        while (t < tLocal ){
-            printf("dt=%lf\n",dt);
-            t += dt;
-            printf("tLocal=%lf\n", tLocal);
-//            getchar();
-
-            for (i=0; i<nCells; i++){
-                v[i] = v[i] - dt/dx*flux[i];
-            }
-            for (i=0; i<nCells; i++) printf("v[%d]=%lf\n",i,v[i]);
-//            getchar();
-
-            dt = GlobalTimeStep(v,dtLocal);
-            if(t + dt > tLocal){
-                dt = tLocal - t;
-            }
+        while (t < tLocal){
 
             for (i=0; i<nCells; i++){
                 if (allowsFrozenFlux[i]){
 
-                    printf("i=%d\n",i);
+//                    printf("i=%d\n",i);
 
                     if (t + dt > tFrozen[i]){
                         flux[i] = FluxFunction(i, v, &FluxCounter);
-                        allowsFrozenFlux[i] = (dtLocal[i] > 2.*dt) && (dtLocal[i-1] > 2.*dt);
+                        allowsFrozenFlux[i] = (dtLocal[i] > 2.*dt);
                         tFrozen[i] = t + dtLocal[i];
-                        printf("i=%d",i);
+//                        printf("i=%d",i);
 
-                        printf("i=%d, t=%lf\n",i,t);
+//                        printf("i=%d, t=%lf\n",i,t);
 
                     }
 
@@ -286,7 +283,55 @@ int main () {
                 }
             }
 
+            for (i=0; i<nCells; i++){
+                if (i>0 && allowsFrozenFlux[i-1]!=allowsFrozenFlux[i]){
+                    if (v[i-1]>0 && !allowsFrozenFlux[i-1]) allowsFrozenFlux[i] = false;
+                    if (v[i]<0 && !allowsFrozenFlux[i]) allowsFrozenFlux[i-1] = false;
+                }
+                if (v[i]>0){
+                    k = MIN((int) v[i] * dtGlobal,nCells-1-i);
+                    for (j=1; j<=k; j++){
+                        tFrozen[i+j] = MIN(tFrozen[i+j], t + j*dx/v[i]);
+                    }
+                } else if (v[i]<0) {
+                    k = MIN((int) -v[i] * dtGlobal,i);
+                    for (j=1; j<=k; j++){
+                        tFrozen[i-j] = MIN(tFrozen[i-j], t - j*dx/v[i]);
+                    }
+                }
+            }
+
+            for (i=0; i<nCells; i++){
+                v[i] = v[i] - dt/dx*flux[i];
+            }
+
+//            printf("dt=%lf\n",dt);
+//            t += dt;
+//            printf("t=%lf\n", t);
+//            getchar();
+
+
+//            for (i=0; i<nCells; i++) printf("v[%d]=%lf\n",i,v[i]);
+//            getchar();
+
+
+            printf("dt=%lf\n",dt);
+            t += dt;
+            printf("t=%lf\n", t);
+
+
+
+
+
+
             IterCounter++;
+
+            dt = MIN(GlobalTimeStep(v,dtLocal),tLocal-t);
+//            if(t + dt > tLocal && tLocal - t >= eps){
+//                dt = tLocal - t;
+//                printf("Patata dt=%lf\n",dt);
+//            }
+//            if (dt < eps) break; printf("Patata\n");
 
 //            getchar();
 
@@ -298,7 +343,7 @@ int main () {
     }
     exactBurgers(t,exact);
     PrintToFile(&PrintCounter, x, v, exact, t);
-    printf("Flux function evaluations:%d, iterations=%d",FluxCounter,IterCounter);
+    printf("Flux function evaluations:%d, iterations=%d, COUNTER=%d",FluxCounter,IterCounter,COUNTER);
     ErrorNorms(v,exact);
     return 0;
 }
@@ -316,7 +361,7 @@ int PrintToFile(int *PrintCounter, double x[], double v[], double exact[], doubl
 
     fprintf(output,"#t=%lf\n",t);
     for(i=0;i<nCells;i++){
-       fprintf(output,"%f %lf %lf\n",x[i],v[i],exact[i]);
+       fprintf(output,"%lf %lf %lf\n",x[i],v[i],exact[i]);
     }
 
     fclose(output);
