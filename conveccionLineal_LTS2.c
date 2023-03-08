@@ -33,7 +33,7 @@ extern void ini_ran(int SEMILLA);
 
 int PrintToFile (int *PrintCounter, double x[], double v[], double t);
 double GlobalTimeStep (double dx[], double t, double *dtLocal);
-double FluxFunction (int i, double v[], double vL[], int *FluxCounter);
+double FluxFunction (int i, double v, double vL, int *FluxCounter);
 double SquareWave (double x);
 double Gaussian (double x);
 void ErrorNorms (double v[], double dx[], double x[]);
@@ -54,15 +54,15 @@ PAGACIÓN DE LA ONDA CUADRADA. ¡¡¡CHECK!!!
     int semilla = 32207;
     ini_ran(semilla);
 
-    int i,iter=0,k=0,printFreq=1;
+    int i,iter=0,k=0,printFreq=1,j=0,l=0;
 	double v[nCells];		// Velocity arrays (conserved variables)
-	double vL[nCells];      // Interpolation points
+	double vL[nCells],dv[nCells];      // Interpolation points
 	double Q[nCells], x[nCells], dx[nCells];			// Discharge, distance
 	double t=0.0, dt, dtGlobal, dtLocal[nCells], tLocal=0., tFrozen[nCells];                // Time
 	double flux[nCells];
 	double A;                       // Area
 	int PrintCounter=0, FluxCounter=0, IterCounter=0;             // Print counter
-	int mLocal[nCells], mMax=0, mPow2Local[nCells];
+	int mLocal[nCells], mMax=0, mPow2Local[nCells], mAux=0, mDif=0, mPow2Dif=0, domainLength=0;
 	int p=0, pTotal=0;
 //	bool allowsFrozenFlux[nCells];
 	double log2 = log(2.);
@@ -85,6 +85,7 @@ PAGACIÓN DE LA ONDA CUADRADA. ¡¡¡CHECK!!!
 	for (i=0;i<nCells;i++){
         v[i] = 0.0;
         vL[i] = 0.0;
+        dv[i] = 0.0;
         Q[i] = 0.0;
         x[i] = 0.0;
         flux[i] = 0.0;
@@ -171,17 +172,24 @@ PAGACIÓN DE LA ONDA CUADRADA. ¡¡¡CHECK!!!
             dt = simTime - t;
         }
 
+
 //        printf("dt=%lf\n",dt);
 //        getchar();
 
         mLocal[0] = (int) log(dtLocal[0]/dt)/log2;
         mMax = mLocal[0];
+        mPow2Local[0] = (int) pow(2,mLocal[0]);
+        printf("mLocal[%d]=%d\n",0,mLocal[0]);
         for (i=1; i<nCells; i++){
             mLocal[i] = (int) log(dtLocal[i]/dt)/log2;
+
+        printf("mLocal[%d]=%d\n",i,mLocal[i]);
             mPow2Local[i] = (int) pow(2,mLocal[i]);
             mMax = MAX(mMax,mLocal[i]);
         }
         pTotal = (int) pow(2,mMax);
+        printf("pTotal = %d\n",pTotal);
+        if (dt == simTime-t) pTotal = 1;
 
 //        printf("dtGlobal=%lf\n",dtGlobal);
 //        printf("kMax=%d\n",kMax);
@@ -191,72 +199,78 @@ PAGACIÓN DE LA ONDA CUADRADA. ¡¡¡CHECK!!!
 //            dtGlobal =  simTime - t;
 //        }
 
-        for (i=0; i<nCells; i++){
-//            allowsFrozenFlux[i] = (dtLocal[i] >= 2.*dt);
-//            printf(allowsFrozenFlux[i] ? "allowsFrozenFlux[i]=true\n" : "allowsFrozenFlux[i]=false\n");
+        vL[0] = v[0];
+        mAux = mLocal[0];
+
+        for (i=1; i<nCells; i++){
 
             vL[i] = v[i];
-//            printf("dtLocal[i]=%lf flux[i]=%lf\n",dtLocal[i],flux[i]);
+            mAux = mLocal[i-1];
+
+            if (mAux < mLocal[i]){
+
+                mDif = mLocal[i] - mAux;
+
+                for (j=0; mLocal[i+j] == mLocal[i] && j<nCells-1-i; j++) domainLength++;
+
+                mPow2Dif = (int) MIN( pow(2,mDif)-1,domainLength);
+                for (j=0; j<mPow2Dif; j++) {
+                    mLocal[i+j] = mAux + ((j+1) / 2); // HOPEFULLY INTEGER QUOTIENT :D
+                    mPow2Local[i+j] = (int) pow(2,mLocal[i+j]);
+                }
+
+//                {
+//
+//                    mPow2Dif = (int) pow(2,j);
+//                    for (k=0; k<mPow2Dif; k++){
+//                        mLocal[i+k+mPow2Dif-1] = mAux + j;
+//                    }
+//                }
+
+                    i = i + domainLength;
+
+            }
+
         }
 
 //        getchar();
 
-//        tLocal = t + dtGlobal;
+        for (p=0; p<pTotal; p++){
 
-//        while (t < tLocal ){
-////            printf("dt=%lf\n",dt);
-//            t += dt;
-////            printf("tLocal=%lf\n", tLocal);
-////            getchar();
-//
-//            for (i=0; i<nCells; i++){
-//                v[i] = v[i] - dt/dx[i]*flux[i];
-//            }
-//
-//            dt = GlobalTimeStep(dx,tLocal,dtLocal);
-//            if(t + dt > tLocal){
-//                dt = tLocal - t;
-//            }
-//
-//            for (i=0; i<nCells; i++){
-//                if (allowsFrozenFlux[i]){
-//
-////                    printf("i=%d\n",i);
-//
-//                    if (t + dt > tFrozen[i]){
-//                        flux[i] = FluxFunction(i, v, &FluxCounter);
-//                        allowsFrozenFlux[i] = (dtLocal[i] >= 2.*dt);
-//                        tFrozen[i] = t + dtLocal[i];
-////                        printf("i=%d",i);
-//
-////                        printf("i=%d, t=%lf\n",i,t);
-//
-//                    }
-//
-//                } else {
-//                    //allowsFrozenFlux[i] = (dtLocal[i] > 2.*dt);
-//                    flux[i] = FluxFunction(i, v, &FluxCounter);
-//                }
-//            }
+            for (i=0; i<nCells; i++){
 
-            for (p=0; p<pTotal; p++){
+                if (p % mPow2Local[i] == 0){
 
-                for (i=0; i<nCells; i++){
-
-                    if (p % mPow2Local[i] == 0){
-
-                        vL[i] = v[i];
-                        v[i] = v[i] - dt * mPow2Local[i] / dx[i] * FluxFunction(i, v, vL, &FluxCounter);
-
+                    if (mLocal[i] == mLocal[i-1] && i>0) {
+                        dv[i] = dt * mPow2Local[i] / dx[i] * FluxFunction(i, v[i], v[i-1], &FluxCounter);
+                    } else {
+                        dv[i] = dt * mPow2Local[i] / dx[i] * FluxFunction(i, v[i], 0.5*(v[i-1]+vL[i-1]), &FluxCounter);
                     }
+
+
+
 
                 }
 
-                t = t + dt;
+            }
+
+            for (i=0; i<nCells; i++){
+
+                if (p % mPow2Local[i] == 0){
+
+                    vL[i] = v[i];
+                    v[i] = v[i] - dv[i];
+                    dv[i] = 0.0;
+
+                }
 
             }
 
-            IterCounter++;
+            t = t + dt;
+
+        }
+
+        IterCounter++;
 
 //            getchar();
 
@@ -312,7 +326,7 @@ double GlobalTimeStep(double dx[], double t, double *dtLocal){
     return dt;
 }
 
-double FluxFunction(int i, double v[], double vL[], int *FluxCounter){
+double FluxFunction(int i, double v, double vL, int *FluxCounter){
 
     *FluxCounter = *FluxCounter + 1;
 
@@ -320,7 +334,7 @@ double FluxFunction(int i, double v[], double vL[], int *FluxCounter){
         return 0.;
     }
 
-    return c * (v[i]- 0.5 * (v[i-1] + vL[i-1]));
+    return c * (v - vL);
 
 }
 
