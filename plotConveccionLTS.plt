@@ -24,3 +24,5 @@ set yrange [0:6]
 f(x) = 5.* exp(-(x-40)**2/2./5.**2)
 
 plot f(x-10) t 'Analytic' lc 'black', 'OutputFiles/conveccionLinealLocalTimeStep1.dat' u 1:2 t 'LTS1' pt 7 ps 1 lc 'red', 'OutputFiles/conveccionLinealUpwind1.dat' u 1:2 t 'Upwind' pt 7 ps 1 lc 'web-blue'
+
+#replot
