@@ -315,9 +315,9 @@ int main () {
 //            getchar();
 
 
-            printf("dt=%lf\n",dt);
+//            printf("dt=%lf\n",dt);
             t += dt;
-            printf("t=%lf\n", t);
+//            printf("t=%lf\n", t);
 
 
 
@@ -393,6 +393,16 @@ double FluxFunction(int i, double v[], int *FluxCounter){
 
     if (i==0 || i==nCells-1){
         return 0.;
+    }
+
+    if (v[i]*v[i-1]<0. && v[i-1]<0.){
+//        return v[i-1]*(v[i]-0.5*(v[i]+v[i-1]));
+        return v[i]*(0.5*(v[i]+v[i-1])-v[i-1]);
+    }
+
+    if (v[i+1]*v[i]<0. && v[i]<0.){
+//        return v[i+1]*(0.5*(v[i+1]+v[i])-v[i]);
+        return v[i]*(v[i+1]-0.5*(v[i+1]+v[i]));
     }
 
     double cPlus,cMinus;
